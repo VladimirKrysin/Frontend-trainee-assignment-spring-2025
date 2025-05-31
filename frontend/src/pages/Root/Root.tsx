@@ -1,12 +1,18 @@
 import React from 'react';
 import { Outlet } from 'react-router';
+import { AppShell } from '@mantine/core';
+import { AppHeader } from '../../ui/Header';
 
 export const Root: React.FC = () => {
   return (
-    <div className="root-container">
-      <main>
+    <AppShell header={{ height: 60 }} padding="md">
+      <AppShell.Header>
+        <AppHeader />
+      </AppShell.Header>
+
+      <AppShell.Main>
         <Outlet />
-      </main>
-    </div>
+      </AppShell.Main>
+    </AppShell>
   );
 };
