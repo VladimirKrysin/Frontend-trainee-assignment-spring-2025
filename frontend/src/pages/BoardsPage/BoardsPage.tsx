@@ -1,18 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Stack, Paper, Group } from '@mantine/core';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { api } from '../../api';
-
-type Board = {
-  id: number;
-  name: string;
-  description: string;
-  taskCount: number;
-};
+import type { Board } from '@/types';
 
 export const BoardsPage: React.FC = () => {
   const [boards, setBoards] = useState<Board[]>([]);
-  const navigate = useNavigate();
 
   useEffect(() => {
     api
@@ -22,10 +15,6 @@ export const BoardsPage: React.FC = () => {
       })
       .catch((err) => console.error(err));
   }, []);
-
-  const handleNavigate = (boardId: number, boardName: string) => {
-    navigate(`/board/${boardId}`, { state: { boardName } });
-  };
 
   return (
     <Box p="md">

@@ -1,47 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Box, Button, Group, Stack, TextInput, Paper } from '@mantine/core';
 import { TaskForm } from '../../ui/TaskForm';
 import { useDisclosure } from '@mantine/hooks';
-import { Link } from 'react-router';
-import { api } from '../../api';
-
-type Assignee = {
-  avatarUrl: string;
-  email: string;
-  fullName: string;
-  id: number;
-};
-
-type Issue = {
-  id: number;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  boardId: number;
-  boardName: string;
-  assignee: Assignee;
-};
+import { useGetAllTasksQuery } from '@/services/tasks';
 
 export const IssuesPage: React.FC = () => {
-  const [issues, setIssues] = useState<Issue[]>([]);
   const [search, setSearch] = useState('');
   const [taskFormOpened, { open: openTaskForm, close: closeTaskForm }] =
     useDisclosure(false);
 
-  useEffect(() => {
-    api
-      .get('/tasks')
-      .then((res) => {
-        setIssues(res.data.data);
-      })
-      .catch((err) => console.error(err));
-  }, []);
+  const { data: issues } = useGetAllTasksQuery(undefined);
 
-  const filtered = issues.filter((issue) =>
+  const filtered = issues?.data.filter((issue) =>
     issue.title.toLowerCase().includes(search.toLowerCase())
   );
-
   return (
     <Box p="md">
       <Group align="flex-start" mb="md">
@@ -54,7 +26,7 @@ export const IssuesPage: React.FC = () => {
         <Button variant="outline">Фильтры</Button>
       </Group>
       <Stack>
-        {filtered.map((issue) => (
+        {filtered?.map((issue) => (
           <Paper key={issue.id} withBorder p="md">
             {issue.title}
           </Paper>

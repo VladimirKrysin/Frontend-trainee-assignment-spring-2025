@@ -2,9 +2,20 @@
 import React from 'react';
 import { Group, Button, Text, Box } from '@mantine/core';
 import { Link, useLocation } from 'react-router';
+import { useDisclosure } from '@mantine/hooks';
+import { TaskForm } from './TaskForm';
 
 export const AppHeader: React.FC = () => {
   const location = useLocation();
+  const [taskFormOpened, { open: openTaskForm, close: closeTaskForm }] =
+    useDisclosure(false);
+
+  const isFromBoard = location.pathname.startsWith('/board');
+  const isFromIssues = location.pathname === '/issues';
+
+  const boardIdFromPath = isFromBoard
+    ? Number(location.pathname.split('/')[2]) // boards/:id
+    : undefined;
 
   return (
     <Box
@@ -39,10 +50,14 @@ export const AppHeader: React.FC = () => {
           Проекты
         </Link>
       </Group>
-
-      <Button component={Link} to="/create">
-        Создать задачу
-      </Button>
+      <Button onClick={openTaskForm}>Создать задачу</Button>
+      <TaskForm
+        opened={taskFormOpened}
+        onClose={closeTaskForm}
+        mode="create"
+        currentBoardId={boardIdFromPath}
+        contextPage={isFromBoard ? 'board' : 'issues'}
+      />
     </Box>
   );
 };

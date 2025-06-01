@@ -1,25 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router';
 import { Box, Button, Group, Stack, Paper, Title } from '@mantine/core';
-import { api } from '../../api';
-
-type Assignee = {
-  avatarUrl: string;
-  email: string;
-  fullName: string;
-  id: number;
-};
-
-type Issue = {
-  id: number;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  boardId: number;
-  boardName: string;
-  assignee: Assignee;
-};
+import { api } from '@/api';
+import type { Issue } from '@/types';
+import { useGetBoardTasksQuery } from '@/services/boards';
 
 type Column = {
   id: string;
@@ -34,29 +18,22 @@ export const Board: React.FC = () => {
 
   const boardName = location.state?.boardName || '';
 
+  const { data: issues } = useGetBoardTasksQuery(id ?? '');
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const boardResponse = await api.get(`/boards/${id}`);
+    if (issues) {
+      const uniqueStatuses = Array.from(
+        new Set<string>(issues.data.map((issue: Issue) => issue.status))
+      );
 
-        const issues = boardResponse.data.data;
-        const uniqueStatuses = Array.from(
-          new Set<string>(issues.map((issue: Issue) => issue.status))
-        );
-
-        const dynamicColumns = uniqueStatuses.map((status) => ({
-          id: status,
-          title: formatStatusName(status),
-          issues: issues.filter((issue: Issue) => issue.status === status),
-        }));
-        setColumns(dynamicColumns);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    loadData();
-  }, [id]);
+      const dynamicColumns = uniqueStatuses.map((status) => ({
+        id: status,
+        title: formatStatusName(status),
+        issues: issues.data.filter((issue: Issue) => issue.status === status),
+      }));
+      setColumns(dynamicColumns);
+    }
+  }, [issues]);
 
   const formatStatusName = (status: string) => {
     return status
@@ -87,13 +64,24 @@ export const Board: React.FC = () => {
       <Title order={2} mb="md">
         {boardName}
       </Title>
-      <Group align="flex-start" grow style={{ gap: '16px' }}>
+      <Group align="stretch" grow style={{ gap: '16px', alignItems: 'stretch' }}>
         {columns.map((column) => (
-          <Paper key={column.id} withBorder p="md" style={{ flex: 1 }}>
+          <Paper
+            key={column.id}
+            withBorder
+            p="md"
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '100%',
+            }}
+          >
             <Title order={4} mb="md">
               {column.title}
             </Title>
-            <Stack>
+            <Stack style={{ flexGrow: 1 }}>
+              {' '}
               {column.issues.map((issue) => (
                 <Paper
                   key={issue.id}

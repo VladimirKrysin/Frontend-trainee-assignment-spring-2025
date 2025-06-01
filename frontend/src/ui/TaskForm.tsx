@@ -1,21 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  TextInput,
-  Select,
-  Textarea,
-  Button,
-  Group,
-  Stack,
-} from '@mantine/core';
-import { api } from '../api.ts';
-
-type Assignee = {
-  avatarUrl: string;
-  email: string;
-  fullName: string;
-  id: number;
-};
+import { Modal, TextInput, Select, Textarea, Button, Group, Stack } from '@mantine/core';
+import { api } from '@/api.ts';
+import type { Assignee } from '@/types.ts';
 
 type TaskFormProps = {
   opened: boolean;
@@ -30,8 +16,8 @@ type TaskFormProps = {
     assigneeId?: number;
   };
   mode: 'create' | 'edit';
-  // Добавляем новый проп для явной передачи ID доски
   currentBoardId?: number;
+  contextPage?: 'board' | 'issues';
 };
 
 export const TaskForm: React.FC<TaskFormProps> = ({
@@ -39,12 +25,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   onClose,
   initialData,
   mode,
-  currentBoardId, // Новый проп
+  currentBoardId,
+  contextPage,
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
-  const [description, setDescription] = useState(
-    initialData?.description || ''
-  );
+  const [description, setDescription] = useState(initialData?.description || '');
   const [priority, setPriority] = useState(initialData?.priority || '');
   const [status, setStatus] = useState(initialData?.status || '');
   const [assigneeId, setAssigneeId] = useState<number | null>(
@@ -53,10 +38,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Определяем boardId для задачи
   const boardId = currentBoardId ?? initialData?.boardId;
 
-  // Загрузка доступных исполнителей
   useEffect(() => {
     api
       .get('/users')
@@ -83,7 +66,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       }
 
       onClose();
-      // Можно добавить callback для обновления списка задач
     } catch (err) {
       console.error(err);
     } finally {
@@ -97,6 +79,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       onClose={onClose}
       title={mode === 'create' ? 'Создание задачи' : 'Редактирование задачи'}
       size="lg"
+      styles={{ root: { width: '100vw' } }}
     >
       <Stack>
         <TextInput
@@ -113,8 +96,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           minRows={3}
         />
 
-        {/* Отображаем проект только если он известен */}
-        {boardId && (
+        {contextPage === 'board' && boardId && (
           <TextInput label="Проект" value={`Доска #${boardId}`} disabled />
         )}
 
@@ -153,15 +135,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           clearable
         />
 
-        {/* Кнопка перехода на доску: показываем только когда: */}
-        {/* - Форма открыта не со страницы доски (!currentBoardId) */}
-        {/* - Задача уже привязана к доске (initialData?.boardId) */}
-        {!currentBoardId && initialData?.boardId && (
-          <Button
-            variant="outline"
-            component="a"
-            href={`/boards/${initialData.boardId}`}
-          >
+        {contextPage === 'issues' && initialData?.boardId && (
+          <Button variant="outline" component="a" href={`/boards/${initialData.boardId}`}>
             Перейти на доску
           </Button>
         )}
@@ -171,7 +146,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             Отмена
           </Button>
           <Button onClick={handleSubmit} loading={loading}>
-            {mode === 'create' ? 'Создать' : 'Обновить'}
+            {mode === 'create' ? 'Создать' : 'Редактировать'}
           </Button>
         </Group>
       </Stack>
