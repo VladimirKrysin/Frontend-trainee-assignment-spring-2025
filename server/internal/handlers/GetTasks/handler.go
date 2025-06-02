@@ -5,6 +5,7 @@ import (
 	"github.com/lev4rT/avito_fe_tech_internship_2025_wave2_backend/internal/errs"
 	"github.com/lev4rT/avito_fe_tech_internship_2025_wave2_backend/internal/models"
 	"gorm.io/gorm"
+	// "time"
 )
 
 type (
@@ -31,6 +32,7 @@ func NewGetTasksHandler(db *gorm.DB) Handler {
 // @Failure 500 {object} errs.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /tasks [get]
 func (h *GetTasksHandler) GetTasks(c *gin.Context) {
+	// time.Sleep(10 * time.Second)
 	tasks, err := h.fetchTasksFromDB()
 	if err != nil {
 		errs.InternalError(c, err, "Ошибка при получении задач")

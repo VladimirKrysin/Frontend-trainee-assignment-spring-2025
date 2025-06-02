@@ -1,21 +1,41 @@
 // src/components/AppHeader.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Group, Button, Text, Box } from '@mantine/core';
 import { Link, useLocation } from 'react-router';
 import { useDisclosure } from '@mantine/hooks';
+import { useAppSelector, useAppDispatch } from '@/hooks/hooks';
+import { setIssues } from '@/store/issues/issueSlice';
 import { TaskForm } from './TaskForm';
+import { useGetAllTasksQuery } from '@/store/issues/issue';
 
 export const AppHeader: React.FC = () => {
+  const dispatch = useAppDispatch();
   const location = useLocation();
   const [taskFormOpened, { open: openTaskForm, close: closeTaskForm }] =
     useDisclosure(false);
 
+  const { data: apiIssues, refetch: refetchIssues } = useGetAllTasksQuery(undefined);
+
+  useEffect(() => {
+    if (apiIssues?.data) {
+      dispatch(setIssues(apiIssues.data));
+    }
+  }, [apiIssues, dispatch]);
+
+  async function updateIssues() {
+    const { data } = await refetchIssues();
+    if (data) {
+      dispatch(setIssues(data.data));
+    }
+  }
+
   const isFromBoard = location.pathname.startsWith('/board');
   const isFromIssues = location.pathname === '/issues';
 
-  const boardIdFromPath = isFromBoard
-    ? Number(location.pathname.split('/')[2]) // boards/:id
-    : undefined;
+  const boardIdFromPath =
+    isFromBoard && location.pathname.split('/')[2]
+      ? Number(location.pathname.split('/')[2])
+      : undefined;
 
   return (
     <Box
@@ -53,10 +73,13 @@ export const AppHeader: React.FC = () => {
       <Button onClick={openTaskForm}>Создать задачу</Button>
       <TaskForm
         opened={taskFormOpened}
-        onClose={closeTaskForm}
-        mode="create"
-        currentBoardId={boardIdFromPath}
-        contextPage={isFromBoard ? 'board' : 'issues'}
+        onCreate={() => updateIssues()}
+        onClose={() => {
+          closeTaskForm();
+        }}
+        mode={'create'}
+        initialData={undefined}
+        contextPage="issues"
       />
     </Box>
   );

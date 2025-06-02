@@ -1,20 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, TextInput, Select, Textarea, Button, Group, Stack } from '@mantine/core';
-import { api } from '@/api.ts';
-import type { Assignee } from '@/types.ts';
+import type { Priorities, Statuses, Issue } from '@/types.ts';
+import { useGetAllUsersQuery } from '@/store/users';
+import { useGetAllBoardsQuery } from '@/store/boards';
+import { useCreateTaskMutation, useUpdateTaskMutation } from '@/store/issues/issue';
+
+type TaskFormData = {
+  title: string;
+  description: string;
+  boardId: number;
+  priority: Priorities;
+  status: Statuses;
+  assigneeId: number | null;
+};
 
 type TaskFormProps = {
   opened: boolean;
+  onUpdate: (updatedTask: Issue) => void;
+  onCreate: () => void;
   onClose: () => void;
-  initialData?: {
-    id?: number;
-    title: string;
-    description: string;
-    boardId?: number;
-    priority: string;
-    status: string;
-    assigneeId?: number;
-  };
+  initialData?: Issue;
   mode: 'create' | 'edit';
   currentBoardId?: number;
   contextPage?: 'board' | 'issues';
@@ -22,56 +27,109 @@ type TaskFormProps = {
 
 export const TaskForm: React.FC<TaskFormProps> = ({
   opened,
+  onUpdate,
   onClose,
+  onCreate,
   initialData,
   mode,
   currentBoardId,
   contextPage,
 }) => {
+  const [createTask] = useCreateTaskMutation();
+  const [updateTask] = useUpdateTaskMutation();
+
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
-  const [priority, setPriority] = useState(initialData?.priority || '');
-  const [status, setStatus] = useState(initialData?.status || '');
-  const [assigneeId, setAssigneeId] = useState<number | null>(
-    initialData?.assigneeId || null
+  const [localBoardId, setLocalBoardId] = useState<number | null>(
+    currentBoardId ?? initialData?.boardId ?? null
   );
-  const [assignees, setAssignees] = useState<Assignee[]>([]);
+  const [priority, setPriority] = useState<Priorities>(initialData?.priority || 'Low');
+  const [status, setStatus] = useState<Statuses>(initialData?.status || 'Backlog');
+  const [assigneeId, setAssigneeId] = useState<number | null>(
+    initialData?.assignee.id || null
+  );
   const [loading, setLoading] = useState(false);
 
   const boardId = currentBoardId ?? initialData?.boardId;
+  const { data: boardsData } = useGetAllBoardsQuery('');
+  const boards = boardsData?.data ?? [];
 
-  useEffect(() => {
-    api
-      .get('/users')
-      .then((res) => setAssignees(res.data.data))
-      .catch((err) => console.error(err));
-  }, []);
+  const { data: assigneesData } = useGetAllUsersQuery(undefined);
+  const assignees = assigneesData?.data ?? [];
 
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const taskData = {
+      const boardId = localBoardId ?? initialData?.boardId;
+      if (!boardId) throw new Error('Board ID is required');
+
+      const board = boards.find((b) => b.id === boardId);
+      if (!board && !initialData?.boardName) throw new Error('Board not found');
+
+      const formData: TaskFormData = {
         title,
         description,
-        priority,
         status,
+        priority,
+        boardId,
         assigneeId,
-        boardId: boardId || undefined,
       };
 
       if (mode === 'create') {
-        await api.post('/tasks', taskData);
-      } else if (initialData?.id) {
-        await api.put(`/tasks/${initialData.id}`, taskData);
-      }
+        await createTask(formData).unwrap();
+        onClose();
+        onCreate();
+      } else {
+        const updateData: Issue = {
+          ...initialData!,
+          ...formData,
+          boardName: board?.name || initialData?.boardName || '',
+          assignee: assigneeId
+            ? assignees.find((a) => a.id === assigneeId)!
+            : initialData!.assignee,
+        };
 
-      onClose();
+        await updateTask({
+          body: updateData,
+          id: initialData!.id,
+        }).unwrap();
+
+        onUpdate(updateData);
+        onClose();
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error saving task:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleAssigneeChange = (value: string | null) => {
+    if (!value) {
+      setAssigneeId(null);
+    } else {
+      const selectedId = parseInt(value, 10);
+      setAssigneeId(selectedId);
+    }
+  };
+
+  useEffect(() => {
+    if (initialData && opened) {
+      setTitle(initialData.title);
+      setDescription(initialData.description);
+      setLocalBoardId(initialData.boardId ?? currentBoardId ?? null);
+      setPriority(initialData.priority);
+      setStatus(initialData.status);
+      setAssigneeId(initialData.assignee.id ?? null);
+    } else if (!initialData && opened) {
+      setTitle('');
+      setDescription('');
+      setLocalBoardId(currentBoardId ?? null);
+      setPriority('Low');
+      setStatus('Backlog');
+      setAssigneeId(null);
+    }
+  }, [initialData, opened, currentBoardId]);
 
   return (
     <Modal
@@ -94,20 +152,43 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           value={description}
           onChange={(e) => setDescription(e.currentTarget.value)}
           minRows={3}
+          required
         />
 
-        {contextPage === 'board' && boardId && (
-          <TextInput label="Проект" value={`Доска #${boardId}`} disabled />
+        {!currentBoardId && (
+          <Select
+            label="Проект"
+            placeholder="Выберите проект"
+            data={boards.map((board) => ({
+              value: String(board.id),
+              label: board.name,
+            }))}
+            value={localBoardId !== null ? String(localBoardId) : null}
+            onChange={(value) => {
+              setLocalBoardId(value ? parseInt(value, 10) : null);
+            }}
+            required
+          />
+        )}
+
+        {contextPage === 'board' && typeof boardId === 'number' && !isNaN(boardId) && (
+          <TextInput
+            label="Проект"
+            value={boards.find((b) => b.id === boardId)?.name ?? ''}
+            disabled
+          />
         )}
 
         <Select
           label="Приоритет"
           value={priority}
-          onChange={(value) => setPriority(value || '')}
+          onChange={(priority) => {
+            setPriority(priority as Priorities);
+          }}
           data={[
-            { value: 'low', label: 'Низкий' },
-            { value: 'medium', label: 'Средний' },
-            { value: 'high', label: 'Высокий' },
+            { value: 'Low', label: 'Low' },
+            { value: 'Medium', label: 'Medium' },
+            { value: 'High', label: 'High' },
           ]}
           required
         />
@@ -115,28 +196,34 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         <Select
           label="Статус"
           value={status}
-          onChange={(value) => setStatus(value || '')}
+          onChange={(value) => {
+            setStatus(value as Statuses);
+          }}
           data={[
-            { value: 'todo', label: 'To Do' },
-            { value: 'in_progress', label: 'In Progress' },
-            { value: 'done', label: 'Done' },
+            { value: 'Backlog', label: 'Backlog' },
+            { value: 'InProgress', label: 'InProgress' },
+            { value: 'Done', label: 'Done' },
           ]}
-          required
         />
 
         <Select
           label="Исполнитель"
-          value={assigneeId?.toString() || ''}
-          onChange={(value) => setAssigneeId(value ? parseInt(value) : null)}
+          value={assigneeId !== null ? assigneeId.toString() : null}
+          onChange={handleAssigneeChange}
           data={assignees.map((assignee) => ({
             value: assignee.id.toString(),
             label: assignee.fullName,
           }))}
+          placeholder="Выберите исполнителя"
           clearable
+          required
         />
 
         {contextPage === 'issues' && initialData?.boardId && (
-          <Button variant="outline" component="a" href={`/boards/${initialData.boardId}`}>
+          <Button
+            component="a"
+            href={`/boards/${initialData.boardId}?taskId=${initialData.id}`}
+          >
             Перейти на доску
           </Button>
         )}
@@ -146,7 +233,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             Отмена
           </Button>
           <Button onClick={handleSubmit} loading={loading}>
-            {mode === 'create' ? 'Создать' : 'Редактировать'}
+            {mode === 'create' ? 'Создать' : 'Обновить'}
           </Button>
         </Group>
       </Stack>

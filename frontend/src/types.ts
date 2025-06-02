@@ -13,8 +13,8 @@ type Issue = {
   id: number;
   title: string;
   description: string;
-  status: string;
-  priority: string;
+  status: Statuses;
+  priority: Priorities;
   boardId: number;
   boardName: string;
   assignee: Assignee;
@@ -27,4 +27,7 @@ type Board = {
   taskCount: number;
 };
 
-export type { Issue, Assignee, FetchBodyWrapper, Board };
+type Statuses = 'Backlog' | 'InProgress' | 'Done';
+type Priorities = 'Low' | 'Medium' | 'High';
+
+export type { Issue, Assignee, FetchBodyWrapper, Board, Statuses, Priorities };

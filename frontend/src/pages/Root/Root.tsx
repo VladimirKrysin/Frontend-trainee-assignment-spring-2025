@@ -9,7 +9,6 @@ export const Root: React.FC = () => {
       <AppShell.Header>
         <AppHeader />
       </AppShell.Header>
-
       <AppShell.Main>
         <Outlet />
       </AppShell.Main>

@@ -1,10 +1,19 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { Issue, FetchBodyWrapper } from '@/types';
+import type { Issue, FetchBodyWrapper, Priorities, Statuses } from '@/types';
 import { BASE_URL } from '@/api';
 
 interface TaskQueryArgs {
   body: Issue;
   id: number;
+}
+
+interface IssueCreateBody {
+  title: string;
+  description: string;
+  boardId: number;
+  priority: Priorities;
+  status: Statuses;
+  assigneeId: number | null;
 }
 
 export const taskApi = createApi({
@@ -17,7 +26,7 @@ export const taskApi = createApi({
     getTask: builder.query<FetchBodyWrapper<Issue>, number>({
       query: (id) => `/tasks/${id}`,
     }),
-    createTask: builder.mutation<FetchBodyWrapper<Issue>, Issue>({
+    createTask: builder.mutation<FetchBodyWrapper<Issue>, IssueCreateBody>({
       query: (body) => ({
         url: '/tasks/create',
         method: 'POST',
