@@ -1,4 +1,18 @@
+/**
+ * @file TaskForm.tsx
+ * @description Компонент формы для создания и редактирования задачи.
+ *
+ * Функциональность:
+ * - Поддерживает режимы создания ('create') и редактирования ('edit').
+ * - Загружает список проектов (досок) и пользователей (исполнителей) из API.
+ * - Управляет локальным состоянием формы: название, описание, проект, приоритет, статус, исполнитель.
+ * - В режиме редактирования подгружает данные из переданной задачи.
+ * - При отправке формы создает или обновляет задачу через API.
+ * - Позволяет навигацию на доску с задачей из режима редактирования.
+ */
+
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { Modal, TextInput, Select, Textarea, Button, Group, Stack } from '@mantine/core';
 import type { Priorities, Statuses, Issue } from '@/types.ts';
 import { useGetAllUsersQuery } from '@/store/users';
@@ -15,14 +29,14 @@ type TaskFormData = {
 };
 
 type TaskFormProps = {
-  opened: boolean;
-  onUpdate: (updatedTask: Issue) => void;
-  onCreate: () => void;
-  onClose: () => void;
-  initialData?: Issue;
-  mode: 'create' | 'edit';
-  currentBoardId?: number;
-  contextPage?: 'board' | 'issues';
+  opened: boolean; // Управление видимостью модального окна
+  onUpdate: (updatedTask: Issue) => void; // Колбек после обновления задачи
+  onCreate: () => void; // Колбек после создания задачи
+  onClose: () => void; // Колбек закрытия формы
+  initialData?: Issue; // Исходные данные для редактирования
+  mode: 'create' | 'edit'; // Режим работы формы
+  currentBoardId?: number; // Идентификатор текущей доски (если открыт из доски)
+  contextPage?: 'board' | 'issues'; // Контекст вызова формы для условного рендера
 };
 
 export const TaskForm: React.FC<TaskFormProps> = ({
@@ -35,9 +49,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   currentBoardId,
   contextPage,
 }) => {
+  const navigate = useNavigate();
+
+  // Мутации для создания и обновления задачи
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
 
+  // Локальное состояние формы
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [localBoardId, setLocalBoardId] = useState<number | null>(
@@ -50,13 +68,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   );
   const [loading, setLoading] = useState(false);
 
-  const boardId = currentBoardId ?? initialData?.boardId;
+  // Данные досок и пользователей из API
   const { data: boardsData } = useGetAllBoardsQuery('');
   const boards = boardsData?.data ?? [];
 
   const { data: assigneesData } = useGetAllUsersQuery(undefined);
   const assignees = assigneesData?.data ?? [];
 
+  /**
+   * Обработчик отправки формы
+   * В режиме создания вызывает createTask, в режиме редактирования — updateTask.
+   * При успешном сохранении вызывает колбеки onCreate или onUpdate.
+   */
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -80,6 +103,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         onClose();
         onCreate();
       } else {
+        // Подготовка обновленных данных задачи
         const updateData: Issue = {
           ...initialData!,
           ...formData,
@@ -104,6 +128,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     }
   };
 
+  // Обработчик выбора исполнителя (преобразует строку в число или null)
   const handleAssigneeChange = (value: string | null) => {
     if (!value) {
       setAssigneeId(null);
@@ -113,6 +138,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     }
   };
 
+  // При открытии формы подгружает данные initialData или сбрасывает форму для создания
   useEffect(() => {
     if (initialData && opened) {
       setTitle(initialData.title);
@@ -155,6 +181,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           required
         />
 
+        {/* Выбор проекта (доски), если не указан текущий контекст доски */}
         {!currentBoardId && (
           <Select
             label="Проект"
@@ -171,13 +198,16 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           />
         )}
 
-        {contextPage === 'board' && typeof boardId === 'number' && !isNaN(boardId) && (
-          <TextInput
-            label="Проект"
-            value={boards.find((b) => b.id === boardId)?.name ?? ''}
-            disabled
-          />
-        )}
+        {/* Отображение названия проекта, если открыт из контекста доски */}
+        {contextPage === 'board' &&
+          typeof localBoardId === 'number' &&
+          !isNaN(localBoardId) && (
+            <TextInput
+              label="Проект"
+              value={boards.find((b) => b.id === localBoardId)?.name ?? ''}
+              disabled
+            />
+          )}
 
         <Select
           label="Приоритет"
@@ -201,7 +231,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           }}
           data={[
             { value: 'Backlog', label: 'Backlog' },
-            { value: 'InProgress', label: 'InProgress' },
+            { value: 'InProgress', label: 'In Progress' },
             { value: 'Done', label: 'Done' },
           ]}
         />
@@ -219,22 +249,25 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           required
         />
 
-        {contextPage === 'issues' && initialData?.boardId && (
-          <Button
-            component="a"
-            href={`/boards/${initialData.boardId}?taskId=${initialData.id}`}
-          >
-            Перейти на доску
-          </Button>
-        )}
-
-        <Group justify="flex-end" mt="md">
-          <Button onClick={onClose} variant="default">
-            Отмена
-          </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            {mode === 'create' ? 'Создать' : 'Обновить'}
-          </Button>
+        <Group justify="space-between" mt="md">
+          {/* Кнопка перехода на доску с задачей, если мы в контексте issues */}
+          {contextPage === 'issues' && initialData?.boardId && (
+            <Button
+              onClick={() => {
+                navigate(`/boards/${initialData.boardId}?taskId=${initialData.id}`);
+              }}
+            >
+              Перейти на доску
+            </Button>
+          )}
+          <Group>
+            <Button onClick={onClose} variant="default">
+              Отмена
+            </Button>
+            <Button onClick={handleSubmit} loading={loading}>
+              {mode === 'create' ? 'Создать' : 'Обновить'}
+            </Button>
+          </Group>
         </Group>
       </Stack>
     </Modal>

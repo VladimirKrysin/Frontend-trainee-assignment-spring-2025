@@ -1,0 +1,12 @@
+{
+    "opts": {
+      "destination": "@/docs", 
+      "recurse": true           
+    },
+    "plugins": [],             
+    "templates": {            
+      "default": {
+        "outputSourceFiles": false  
+      }
+    }
+  }
